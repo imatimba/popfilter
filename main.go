@@ -36,9 +36,9 @@ func main() {
 
 	switch *releaseGroupPtr {
 	case "BHDStudio":
-		scoreThreshold = 0.6286
+		scoreThreshold = 2.520739041141921
 	case "FraMeSToR":
-		scoreThreshold = 0.6256
+		scoreThreshold = 2.697175367320239
 	}
 
 	movieDetails, err := GetMovieDetailsWorkflow(*titlePtr, tmdbAPIKey, *yearPtr)
@@ -68,7 +68,7 @@ func main() {
 
 	fmt.Printf("Score: %f\n", score)
 
-	if score > scoreThreshold {
+	if score >= scoreThreshold {
 		os.Exit(0)
 	}
 

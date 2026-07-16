@@ -4,79 +4,86 @@ import (
 	"math"
 )
 
+// scoringConfig holds per-dataset weights for the additive scoring formula.
+type scoringConfig struct {
+	wVc   float64
+	wPop  float64
+	wVa   float64
+	wEn   float64
+	wYear float64
+}
+
+var (
+	bhdstudioConfig = scoringConfig{
+		wVc:   2.2900,
+		wPop:  1.3500,
+		wVa:   0.5300,
+		wEn:   0.4000,
+		wYear: 0.0600,
+	}
+	framestorConfig = scoringConfig{
+		wVc:   2.4900,
+		wPop:  -0.5400,
+		wVa:   1.5200,
+		wEn:   0.2000,
+		wYear: 0.0900,
+	}
+)
+
+const (
+	maxPop             float64 = 3000.0
+	maxVa              float64 = 10.0
+	maxVc              float64 = 150000.0
+	newReleaseBaseYear int64   = 2020
+
+	// Genre modifiers (additive)
+	wHorror  float64 = -0.10
+	wHistory float64 = 0.05
+	wFamily  float64 = 0.05
+)
+
 func ComputeScore(popularity, voteAverage float64,
 	voteCount, year int64,
 	language, releaseGroup string,
 	genres []string) float64 {
 
-	const (
-		// Normalization constants
-		maxPop float64 = 3000.0
-		maxVa  float64 = 10.0
-		maxVc  float64 = 150000.0
-
-		// Recency Boost (adds +X% to score per year after the base year)
-		newReleaseBoost    float64 = 0.02
-		newReleaseBaseYear int64   = 2020
-
-		// Modifiers that had the most impact on the score (tuned via grid search, 2026-07-15)
-		enBoost       float64 = 1.08
-		historyBoost  float64 = 1.07
-		horrorPenalty float64 = 0.92
-	)
-
-	// Exponents for the weighted geometric mean (tuned via grid search, 2026-07-15)
-
-	var (
-		expPop float64
-		expVa  float64
-		expVc  float64
-	)
-
+	// Select config based on release group
+	var cfg scoringConfig
 	switch releaseGroup {
 	case "BHDStudio":
-		expPop = 0.2440
-		expVa = 0.0770
-		expVc = 0.3280
+		cfg = bhdstudioConfig
 	case "FraMeSToR":
-		expPop = 0.0250
-		expVa = 0.2980
-		expVc = 0.6900
+		cfg = framestorConfig
 	}
 
-	logMaxPop := math.Log(maxPop)
-	logMaxVc := math.Log(maxVc)
+	logMaxPop := math.Log1p(maxPop)
+	logMaxVc := math.Log1p(maxVc)
 
-	popNorm := math.Log(popularity+1.0) / logMaxPop
-	vaNorm := voteAverage / maxVa
-	vcNorm := math.Log(float64(voteCount)+1.0) / logMaxVc
+	popNorm := math.Max(math.Log1p(popularity)/logMaxPop, 1e-9)
+	vaNorm := math.Max(voteAverage/maxVa, 1e-9)
+	vcNorm := math.Max(math.Log1p(float64(voteCount))/logMaxVc, 1e-9)
 
-	// Guard against zero/negative after normalization
-	if popNorm < 0 || vaNorm < 0 || vcNorm < 0 {
-		return 0.0
-	}
+	score := (cfg.wVc * vcNorm) + (cfg.wPop * popNorm) + (cfg.wVa * vaNorm)
 
-	score := math.Pow(popNorm, expPop) * math.Pow(vaNorm, expVa) * math.Pow(vcNorm, expVc)
-
-	// Recency Boost for new movies lacking historical vote_count
+	// Recency boost
 	if year > newReleaseBaseYear {
-		yearsNew := year - newReleaseBaseYear
-		recencyBoost := 1.0 + (float64(yearsNew) * newReleaseBoost)
-		score *= recencyBoost
+		score += cfg.wYear * float64(year-newReleaseBaseYear)
 	}
 
 	// Language modifier
 	if language == "en" {
-		score *= enBoost
+		score += cfg.wEn
 	}
 
 	// Genre modifiers
 	for _, genre := range genres {
-		if genre == "History" {
-			score *= historyBoost
-		}
-		if genre == "Horror" {
-			score *= horrorPenalty
+		switch genre {
+		case "Horror":
+			score += wHorror
+		case "History":
+			score += wHistory
+		case "Family":
+			score += wFamily
 		}
 	}
 
