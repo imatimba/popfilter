@@ -18,18 +18,18 @@ func main() {
 	err := godotenv.Load()
 	if err != nil {
 		fmt.Println("Error loading .env file")
-		return
+		os.Exit(1)
 	}
 
 	tmdbAPIKey := os.Getenv("TMDB_API_KEY")
 	if tmdbAPIKey == "" {
 		fmt.Println("Error: TMDB_API_KEY not set in .env file")
-		return
+		os.Exit(1)
 	}
 
 	if *titlePtr == "" || *releaseGroupPtr == "" || *yearPtr == 0 {
 		flag.PrintDefaults()
-		return
+		os.Exit(1)
 	}
 
 	var scoreThreshold float64
@@ -44,7 +44,7 @@ func main() {
 	movieDetails, err := GetMovieDetailsWorkflow(*titlePtr, tmdbAPIKey, *yearPtr)
 	if err != nil {
 		fmt.Println("Error:", err)
-		return
+		os.Exit(1)
 	}
 
 	genres := make([]string, len(movieDetails.Genres))
@@ -55,7 +55,7 @@ func main() {
 	year, err := strconv.ParseInt(movieDetails.ReleaseDate[:4], 10, 64)
 	if err != nil {
 		fmt.Printf("Error: %v", err)
-		return
+		os.Exit(1)
 	}
 
 	score := ComputeScore(movieDetails.Popularity,
