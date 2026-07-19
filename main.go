@@ -10,6 +10,8 @@ import (
 )
 
 func main() {
+	os.Args = preprocessArgs(os.Args)
+
 	titlePtr := flag.String("title", "", "Required. Title of the movie to search for.")
 	yearPtr := flag.Int64("year", 0, "Required. Year of release.")
 	releaseGroupPtr := flag.String("release-group", "", "Required. Release group of the movie to search for.")
