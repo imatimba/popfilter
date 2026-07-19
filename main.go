@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"os"
 	"strconv"
-
-	"github.com/joho/godotenv"
 )
 
 func main() {
@@ -17,15 +15,9 @@ func main() {
 	releaseGroupPtr := flag.String("release-group", "", "Required. Release group of the movie to search for.")
 	flag.Parse()
 
-	err := godotenv.Load()
+	tmdbAPIKey, err := getTMDBAPIKey()
 	if err != nil {
-		fmt.Println("Error loading .env file")
-		os.Exit(1)
-	}
-
-	tmdbAPIKey := os.Getenv("TMDB_API_KEY")
-	if tmdbAPIKey == "" {
-		fmt.Println("Error: TMDB_API_KEY not set in .env file")
+		fmt.Println("Error:", err)
 		os.Exit(1)
 	}
 

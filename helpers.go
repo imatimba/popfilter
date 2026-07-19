@@ -1,6 +1,12 @@
 package main
 
-import "strings"
+import (
+	"fmt"
+	"os"
+	"strings"
+
+	"github.com/joho/godotenv"
+)
 
 // preprocessArgs merges a bare (unquoted) -title value spread across
 // multiple argv tokens into a single token so flag.Parse() handles it.
@@ -40,4 +46,18 @@ func preprocessArgs(args []string) []string {
 		i++
 	}
 	return result
+}
+
+func getTMDBAPIKey() (string, error) {
+	// 1. Explicit env var (most portable)
+	if key := os.Getenv("TMDB_API_KEY"); key != "" {
+		return key, nil
+	}
+	// 2. Local .env for dev convenience
+	_ = godotenv.Load()
+	if key := os.Getenv("TMDB_API_KEY"); key != "" {
+		return key, nil
+	}
+
+	return "", fmt.Errorf("TMDB_API_KEY not set (env var, .env)")
 }
