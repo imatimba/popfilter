@@ -16,7 +16,7 @@ type scoringConfig struct {
 }
 
 var configs = map[string]scoringConfig{
-	"BHDStudio": {
+	"BHDStudio-2160p": {
 		scoreThreshold: 2.520739041141921,
 		wVc:            2.2900,
 		wPop:           1.3500,
@@ -24,7 +24,15 @@ var configs = map[string]scoringConfig{
 		wEn:            0.4000,
 		wYear:          0.0600,
 	},
-	"FraMeSToR": {
+	"BHDStudio-1080p": {
+		scoreThreshold: 3.1163,
+		wVc:            3.3650,
+		wPop:           1.8550,
+		wVa:            0.2000,
+		wEn:            0.6000,
+		wYear:          0.1500,
+	},
+	"FraMeSToR-2160p": {
 		scoreThreshold: 2.697175367320239,
 		wVc:            2.4900,
 		wPop:           -0.5400,
@@ -58,16 +66,10 @@ func getConfig(releaseGroup string) (scoringConfig, error) {
 
 // ComputeScore returns a desirability score from TMDB features, release year,
 // language, and genres using a weighted additive model.
-func ComputeScore(popularity, voteAverage float64,
+func (cfg *scoringConfig) ComputeScore(popularity, voteAverage float64,
 	voteCount, year int64,
 	language, releaseGroup string,
 	genres []string) float64 {
-
-	cfg, err := getConfig(releaseGroup)
-	if err != nil {
-		return 0.0
-	}
-
 	logMaxPop := math.Log1p(maxPop)
 	logMaxVc := math.Log1p(maxVc)
 

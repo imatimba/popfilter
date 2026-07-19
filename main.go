@@ -13,6 +13,8 @@ func main() {
 	titlePtr := flag.String("title", "", "Required. Title of the movie to search for.")
 	yearPtr := flag.Int64("year", 0, "Required. Year of release.")
 	releaseGroupPtr := flag.String("release-group", "", "Required. Release group of the movie to search for.")
+	videoResolutionPtr := flag.String("video-resolution", "", "Required. Video resolution of the movie to search for.")
+
 	flag.Parse()
 
 	tmdbAPIKey, err := getTMDBAPIKey()
@@ -21,12 +23,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	if *titlePtr == "" || *releaseGroupPtr == "" || *yearPtr == 0 {
+	if *titlePtr == "" || *releaseGroupPtr == "" || *yearPtr == 0 || *videoResolutionPtr == "" {
 		flag.PrintDefaults()
 		os.Exit(1)
 	}
 
-	cfg, err := getConfig(*releaseGroupPtr)
+	cfg, err := getConfig(fmt.Sprintf("%s-%s", *releaseGroupPtr, *videoResolutionPtr))
 	if err != nil {
 		fmt.Println("Error:", err)
 		os.Exit(1)
@@ -49,7 +51,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	score := ComputeScore(movieDetails.Popularity,
+	score := cfg.ComputeScore(movieDetails.Popularity,
 		movieDetails.VoteAverage,
 		movieDetails.VoteCount,
 		year,
