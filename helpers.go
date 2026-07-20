@@ -48,7 +48,7 @@ func preprocessArgs(args []string) []string {
 	return result
 }
 
-func getTMDBAPIKey() (string, error) {
+func getTMDBAPIKey(argAPIKey *string) (string, error) {
 	// 1. Explicit env var (most portable)
 	if key := os.Getenv("TMDB_API_KEY"); key != "" {
 		return key, nil
@@ -58,6 +58,10 @@ func getTMDBAPIKey() (string, error) {
 	if key := os.Getenv("TMDB_API_KEY"); key != "" {
 		return key, nil
 	}
+	// 3. Optional arg
+	if *argAPIKey != "" {
+		return *argAPIKey, nil
+	}
 
-	return "", fmt.Errorf("TMDB_API_KEY not set (env var, .env)")
+	return "", fmt.Errorf("TMDB_API_KEY not set (env var, .env or --tmdb-api-key)")
 }

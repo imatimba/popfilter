@@ -13,10 +13,11 @@ func main() {
 	yearPtr := flag.Int64("year", 0, "Required. Year of release.")
 	releaseGroupPtr := flag.String("release-group", "", "Required. Release group of the movie to search for.")
 	videoResolutionPtr := flag.String("video-resolution", "", "Required. Video resolution of the movie to search for.")
+	tmdbAPIKeyPtr := flag.String("tmdb-api-key", "", "Optional. TMDB API key.")
 
 	flag.Parse()
 
-	tmdbAPIKey, err := getTMDBAPIKey()
+	tmdbAPIKey, err := getTMDBAPIKey(tmdbAPIKeyPtr)
 	if err != nil {
 		fmt.Println("Error:", err)
 		os.Exit(1)
