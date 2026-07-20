@@ -4,7 +4,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"strconv"
 )
 
 func main() {
@@ -45,25 +44,21 @@ func main() {
 		genres[i] = genre.Name
 	}
 
-	year, err := strconv.ParseInt(movieDetails.ReleaseDate[:4], 10, 64)
-	if err != nil {
-		fmt.Printf("Error: %v", err)
-		os.Exit(1)
-	}
-
 	score := cfg.ComputeScore(movieDetails.Popularity,
 		movieDetails.VoteAverage,
 		movieDetails.VoteCount,
-		year,
+		*yearPtr,
 		movieDetails.OriginalLanguage,
 		*releaseGroupPtr,
 		genres)
 
-	fmt.Printf("Score: %f\n", score)
+	fmt.Printf("Score for %s [%s] %s: %f\n", movieDetails.Title, *releaseGroupPtr, *videoResolutionPtr, score)
 
 	if score >= cfg.scoreThreshold {
+		fmt.Println("Exiting with status code 0")
 		os.Exit(0)
 	}
 
+	fmt.Println("Exiting with status code 1")
 	os.Exit(1)
 }

@@ -14,7 +14,7 @@ type Genre struct {
 }
 
 type MovieResult struct {
-	OriginalTitle    string  `json:"original_title"`
+	Title            string  `json:"title"`
 	OriginalLanguage string  `json:"original_language"`
 	ID               int64   `json:"id"`
 	Popularity       float64 `json:"popularity"`
@@ -70,7 +70,7 @@ func SearchMovieID(title, tmdbAPIKey string, year int64) (int64, error) {
 		}
 
 		releaseYear := result.ReleaseDate[:4]
-		if result.OriginalTitle == title && releaseYear == fmt.Sprintf("%d", year) {
+		if result.Title == title && releaseYear == fmt.Sprintf("%d", year) {
 			return result.ID, nil
 		}
 	}
