@@ -16,7 +16,7 @@ type scoringConfig struct {
 }
 
 var configs = map[string]scoringConfig{
-	"BHDStudio-2160p": {
+	"BHDStudio-Movies-2160p": {
 		scoreThreshold: 2.520739041141921,
 		wVc:            2.2900,
 		wPop:           1.3500,
@@ -24,7 +24,7 @@ var configs = map[string]scoringConfig{
 		wEn:            0.4000,
 		wYear:          0.0600,
 	},
-	"BHDStudio-1080p": {
+	"BHDStudio-Movies-1080p": {
 		scoreThreshold: 3.1163,
 		wVc:            3.3650,
 		wPop:           1.8550,
@@ -32,7 +32,7 @@ var configs = map[string]scoringConfig{
 		wEn:            0.6000,
 		wYear:          0.1500,
 	},
-	"FraMeSToR-2160p": {
+	"FraMeSToR-Movies-2160p": {
 		scoreThreshold: 2.697175367320239,
 		wVc:            2.4900,
 		wPop:           -0.5400,
@@ -40,7 +40,7 @@ var configs = map[string]scoringConfig{
 		wEn:            0.2000,
 		wYear:          0.0900,
 	},
-	"BYNDR-2160p": {
+	"BYNDR-Movies-2160p": {
 		scoreThreshold: 1.7245,
 		wVc:            2.0000,
 		wPop:           -0.1000,
@@ -48,7 +48,7 @@ var configs = map[string]scoringConfig{
 		wEn:            0.0000,
 		wYear:          0.1500,
 	},
-	"BYNDR-1080p": {
+	"BYNDR-Movies-1080p": {
 		scoreThreshold: 1.8645,
 		wVc:            3.3500,
 		wPop:           1.0600,
@@ -56,7 +56,7 @@ var configs = map[string]scoringConfig{
 		wEn:            0.2000,
 		wYear:          0.0000,
 	},
-	"FLUX-2160p": {
+	"FLUX-Movies-2160p": {
 		scoreThreshold: 2.3110,
 		wVc:            2.2200,
 		wPop:           0.4400,
@@ -64,12 +64,28 @@ var configs = map[string]scoringConfig{
 		wEn:            0.2000,
 		wYear:          0.1200,
 	},
-	"FLUX-1080p": {
+	"FLUX-Movies-1080p": {
 		scoreThreshold: 2.5128,
 		wVc:            3.0700,
 		wPop:           -0.6000,
 		wVa:            0.7800,
 		wEn:            0.6000,
+		wYear:          0.1500,
+	},
+	"FLUX-TV-2160p": {
+		scoreThreshold: 0.9165,
+		wVc:            1.2500,
+		wPop:           0.2100,
+		wVa:            0.0000,
+		wEn:            0.2000,
+		wYear:          0.0300,
+	},
+	"FLUX-TV-1080p": {
+		scoreThreshold: 2.5803,
+		wVc:            3.2000,
+		wPop:           0.2000,
+		wVa:            0.4900,
+		wEn:            0.4000,
 		wYear:          0.1500,
 	},
 }

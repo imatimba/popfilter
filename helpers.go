@@ -65,3 +65,15 @@ func getTMDBAPIKey(argAPIKey *string) (string, error) {
 
 	return "", fmt.Errorf("TMDB_API_KEY not set (env var, .env or --tmdb-api-key)")
 }
+
+func getMediaType(mediaType string) (string, error) {
+	switch mediaType {
+	case "Movies":
+		mediaType = "movie"
+	case "TV":
+		mediaType = "tv"
+	default:
+		return "", fmt.Errorf("invalid media type: %s", mediaType)
+	}
+	return mediaType, nil
+}
