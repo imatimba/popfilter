@@ -40,6 +40,14 @@ var configs = map[string]scoringConfig{
 		wEn:            0.2000,
 		wYear:          0.0900,
 	},
+	"FraMeSToR-Movies-1080p": {
+		scoreThreshold: 3.2661,
+		wVc:            3.4200,
+		wPop:           0.1000,
+		wVa:            1.6500,
+		wEn:            0.2000,
+		wYear:          0.0900,
+	},
 	"BYNDR-Movies-2160p": {
 		scoreThreshold: 1.7245,
 		wVc:            2.0000,
