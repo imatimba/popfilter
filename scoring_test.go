@@ -18,8 +18,8 @@ func referenceScore(
 	weights := map[string]struct {
 		wVc, wPop, wVa, wEn, wYear float64
 	}{
-		"BHDStudio-2160p": {2.29, 1.35, 0.53, 0.40, 0.06},
-		"FraMeSToR-2160p": {2.49, -0.54, 1.52, 0.20, 0.09},
+		"BHDStudio-Movies-2160p": {2.29, 1.35, 0.53, 0.40, 0.06},
+		"FraMeSToR-Movies-2160p": {2.49, -0.54, 1.52, 0.20, 0.09},
 	}
 
 	w, ok := weights[releaseGroup]
@@ -27,17 +27,17 @@ func referenceScore(
 		return 0.0, false
 	}
 
-	logMaxPop := math.Log1p(3000.0)
-	logMaxVc := math.Log1p(150000.0)
+	logMaxPop := math.Log1p(maxPop)
+	logMaxVc := math.Log1p(maxVc)
 
 	popNorm := math.Max(math.Log1p(popularity)/logMaxPop, 1e-9)
-	vaNorm := math.Max(voteAverage/10.0, 1e-9)
+	vaNorm := math.Max(voteAverage/maxVa, 1e-9)
 	vcNorm := math.Max(math.Log1p(float64(voteCount))/logMaxVc, 1e-9)
 
 	score := w.wVc*vcNorm + w.wPop*popNorm + w.wVa*vaNorm
 
-	if year > 2020 {
-		score += w.wYear * float64(year-2020)
+	if year > newReleaseBaseYear {
+		score += w.wYear * float64(year-newReleaseBaseYear)
 	}
 
 	if language == "en" {
@@ -49,13 +49,13 @@ func referenceScore(
 		genreSet[g] = struct{}{}
 	}
 	if _, ok := genreSet["Horror"]; ok {
-		score += -0.10
+		score += wHorror
 	}
 	if _, ok := genreSet["History"]; ok {
-		score += 0.05
+		score += wHistory
 	}
 	if _, ok := genreSet["Family"]; ok {
-		score += 0.05
+		score += wFamily
 	}
 
 	return score, true
@@ -67,7 +67,7 @@ func almostEqual(a, b, eps float64) bool {
 
 func TestGetConfig(t *testing.T) {
 	t.Run("valid groups", func(t *testing.T) {
-		for _, group := range []string{"BHDStudio-2160p", "FraMeSToR-2160p"} {
+		for _, group := range []string{"BHDStudio-Movies-2160p", "FraMeSToR-Movies-2160p"} {
 			cfg, err := getConfig(group)
 			if err != nil {
 				t.Fatalf("getConfig(%q) unexpected error: %v", group, err)
@@ -105,7 +105,7 @@ func TestComputeScore_ParityWithReference(t *testing.T) {
 			voteCount:    5000,
 			year:         2019,
 			language:     "es",
-			releaseGroup: "BHDStudio-2160p",
+			releaseGroup: "BHDStudio-Movies-2160p",
 			genres:       []string{"Drama"},
 		},
 		{
@@ -115,7 +115,7 @@ func TestComputeScore_ParityWithReference(t *testing.T) {
 			voteCount:    10000,
 			year:         2018,
 			language:     "fr",
-			releaseGroup: "FraMeSToR-2160p",
+			releaseGroup: "FraMeSToR-Movies-2160p",
 			genres:       []string{"Action"},
 		},
 		{
@@ -125,7 +125,7 @@ func TestComputeScore_ParityWithReference(t *testing.T) {
 			voteCount:    2000,
 			year:         2023,
 			language:     "de",
-			releaseGroup: "BHDStudio-2160p",
+			releaseGroup: "BHDStudio-Movies-2160p",
 			genres:       []string{"Comedy"},
 		},
 		{
@@ -135,7 +135,7 @@ func TestComputeScore_ParityWithReference(t *testing.T) {
 			voteCount:    8000,
 			year:         2019,
 			language:     "en",
-			releaseGroup: "BHDStudio-2160p",
+			releaseGroup: "BHDStudio-Movies-2160p",
 			genres:       []string{"Thriller"},
 		},
 		{
@@ -145,7 +145,7 @@ func TestComputeScore_ParityWithReference(t *testing.T) {
 			voteCount:    15000,
 			year:         2021,
 			language:     "en",
-			releaseGroup: "FraMeSToR-2160p",
+			releaseGroup: "FraMeSToR-Movies-2160p",
 			genres:       []string{"Horror", "Thriller"},
 		},
 		{
@@ -155,7 +155,7 @@ func TestComputeScore_ParityWithReference(t *testing.T) {
 			voteCount:    20000,
 			year:         2020,
 			language:     "en",
-			releaseGroup: "BHDStudio-2160p",
+			releaseGroup: "BHDStudio-Movies-2160p",
 			genres:       []string{"History", "Family", "Drama"},
 		},
 		{
@@ -165,7 +165,7 @@ func TestComputeScore_ParityWithReference(t *testing.T) {
 			voteCount:    50000,
 			year:         2024,
 			language:     "en",
-			releaseGroup: "BHDStudio-2160p",
+			releaseGroup: "BHDStudio-Movies-2160p",
 			genres:       []string{"Horror", "History", "Family"},
 		},
 		{
@@ -175,7 +175,7 @@ func TestComputeScore_ParityWithReference(t *testing.T) {
 			voteCount:    10000,
 			year:         2022,
 			language:     "en",
-			releaseGroup: "BHDStudio-2160p",
+			releaseGroup: "BHDStudio-Movies-2160p",
 			genres:       []string{"Horror", "Horror", "Horror"},
 		},
 		{
@@ -185,7 +185,7 @@ func TestComputeScore_ParityWithReference(t *testing.T) {
 			voteCount:    0,
 			year:         2023,
 			language:     "en",
-			releaseGroup: "BHDStudio-2160p",
+			releaseGroup: "BHDStudio-Movies-2160p",
 			genres:       []string{},
 		},
 		{
@@ -195,7 +195,7 @@ func TestComputeScore_ParityWithReference(t *testing.T) {
 			voteCount:    1000,
 			year:         2019,
 			language:     "es",
-			releaseGroup: "FraMeSToR-2160p",
+			releaseGroup: "FraMeSToR-Movies-2160p",
 			genres:       []string{"Drama"},
 		},
 		{
@@ -205,7 +205,7 @@ func TestComputeScore_ParityWithReference(t *testing.T) {
 			voteCount:    0,
 			year:         2019,
 			language:     "es",
-			releaseGroup: "BHDStudio-2160p",
+			releaseGroup: "BHDStudio-Movies-2160p",
 			genres:       []string{},
 		},
 		{
@@ -215,7 +215,7 @@ func TestComputeScore_ParityWithReference(t *testing.T) {
 			voteCount:    50000,
 			year:         2025,
 			language:     "en",
-			releaseGroup: "FraMeSToR-2160p",
+			releaseGroup: "FraMeSToR-Movies-2160p",
 			genres:       []string{"Action"},
 		},
 		{
@@ -225,7 +225,7 @@ func TestComputeScore_ParityWithReference(t *testing.T) {
 			voteCount:    5000,
 			year:         2020,
 			language:     "es",
-			releaseGroup: "BHDStudio-2160p",
+			releaseGroup: "BHDStudio-Movies-2160p",
 			genres:       []string{},
 		},
 		{
@@ -280,12 +280,12 @@ func TestComputeScore_ParityWithReference(t *testing.T) {
 }
 
 func TestComputeScore_DuplicateGenresAppliedOnce(t *testing.T) {
-	cfg, err := getConfig("BHDStudio-2160p")
+	cfg, err := getConfig("BHDStudio-Movies-2160p")
 	if err != nil {
 		t.Fatalf("getConfig failed: %v", err)
 	}
-	single := cfg.ComputeScore(200, 7.0, 10000, 2022, "en", "BHDStudio-2160p", []string{"Horror"})
-	triple := cfg.ComputeScore(200, 7.0, 10000, 2022, "en", "BHDStudio-2160p", []string{"Horror", "Horror", "Horror"})
+	single := cfg.ComputeScore(200, 7.0, 10000, 2022, "en", "BHDStudio-Movies-2160p", []string{"Horror"})
+	triple := cfg.ComputeScore(200, 7.0, 10000, 2022, "en", "BHDStudio-Movies-2160p", []string{"Horror", "Horror", "Horror"})
 	if !almostEqual(single, triple, tolerance) {
 		t.Fatalf("duplicate genres should apply once: single=%f triple=%f", single, triple)
 	}
@@ -307,7 +307,7 @@ func TestComputeScore_ScoreThresholds(t *testing.T) {
 	}{
 		{
 			name:         "BHDStudio desirable",
-			releaseGroup: "BHDStudio-2160p",
+			releaseGroup: "BHDStudio-Movies-2160p",
 			popularity:   500,
 			voteAverage:  8.0,
 			voteCount:    20000,
@@ -318,7 +318,7 @@ func TestComputeScore_ScoreThresholds(t *testing.T) {
 		},
 		{
 			name:         "BHDStudio undesirable",
-			releaseGroup: "BHDStudio-2160p",
+			releaseGroup: "BHDStudio-Movies-2160p",
 			popularity:   1,
 			voteAverage:  3.0,
 			voteCount:    10,
@@ -329,7 +329,7 @@ func TestComputeScore_ScoreThresholds(t *testing.T) {
 		},
 		{
 			name:         "FraMeSToR desirable",
-			releaseGroup: "FraMeSToR-2160p",
+			releaseGroup: "FraMeSToR-Movies-2160p",
 			popularity:   800,
 			voteAverage:  8.5,
 			voteCount:    50000,
@@ -340,7 +340,7 @@ func TestComputeScore_ScoreThresholds(t *testing.T) {
 		},
 		{
 			name:         "FraMeSToR undesirable",
-			releaseGroup: "FraMeSToR-2160p",
+			releaseGroup: "FraMeSToR-Movies-2160p",
 			popularity:   5,
 			voteAverage:  2.0,
 			voteCount:    50,
