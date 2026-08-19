@@ -44,6 +44,10 @@ func main() {
 		os.Exit(1)
 	}
 
+	if base := os.Getenv("TMDB_BASE_URL"); base != "" {
+		tmdbBaseURL = base
+	}
+
 	mediaDetails, err := GetMediaDetailsWorkflow(*titlePtr, *mediaTypePtr, tmdbAPIKey, *yearPtr)
 	if err != nil {
 		slog.Error("tmdb workflow failed", "error", err, "title", *titlePtr, "media_type", *mediaTypePtr, "year", *yearPtr)
@@ -63,6 +67,8 @@ func main() {
 		*releaseGroupPtr,
 		genres)
 
+	logScoringDecision(cfg, mediaDetails, *titlePtr, *mediaTypePtr, *yearPtr, *releaseGroupPtr, *videoResolutionPtr, keySource, keyPresent, score, genres)
+
 	fmt.Printf("Score for %s [%s] %s: %f\n", mediaDetails.Title, *releaseGroupPtr, *videoResolutionPtr, score)
 
 	if score >= cfg.scoreThreshold {
@@ -72,4 +78,41 @@ func main() {
 
 	slog.Info("exiting", "decision", "reject", "score", score, "threshold", cfg.scoreThreshold, "title", *titlePtr, "media_type", *mediaTypePtr, "release_group", *releaseGroupPtr, "video_resolution", *videoResolutionPtr, "tmdb_id", mediaDetails.ID, "resolved_title", mediaDetails.Title)
 	os.Exit(1)
+}
+
+func logScoringDecision(cfg scoringConfig, mediaDetails MediaResult, title, mediaType string, year int64, releaseGroup, videoResolution, keySource string, keyPresent bool, score float64, genres []string) {
+	decision := "reject"
+	if score >= cfg.scoreThreshold {
+		decision = "keep"
+	}
+	slog.Info("score decision",
+		"title", title,
+		"media_type", mediaType,
+		"year", year,
+		"release_group", releaseGroup,
+		"video_resolution", videoResolution,
+		"tmdb_id", mediaDetails.ID,
+		"resolved_title", mediaDetails.Title,
+		"score", score,
+		"threshold", cfg.scoreThreshold,
+		"decision", decision,
+		"key_source", keySource,
+		"key_present", keyPresent,
+	)
+	slog.Debug("score inputs",
+		"title", title,
+		"media_type", mediaType,
+		"popularity", mediaDetails.Popularity,
+		"vote_average", mediaDetails.VoteAverage,
+		"vote_count", mediaDetails.VoteCount,
+		"release_year", mediaDetails.ReleaseYear,
+		"original_language", mediaDetails.OriginalLanguage,
+		"genres", genres,
+		"weights", fmt.Sprintf("wVc=%.4f wPop=%.4f wVa=%.4f wEn=%.4f wYear=%.4f", cfg.wVc, cfg.wPop, cfg.wVa, cfg.wEn, cfg.wYear),
+		"score", score,
+		"threshold", cfg.scoreThreshold,
+		"decision", decision,
+		"tmdb_id", mediaDetails.ID,
+		"resolved_title", mediaDetails.Title,
+	)
 }
