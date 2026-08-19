@@ -21,6 +21,7 @@ profile.cov
 # Dependency directories (remove the comment below to include it)
 # vendor/
 popularity-test/
+.kilo/
 
 # Go workspace file
 go.work
@@ -29,6 +30,12 @@ go.work.sum
 # env file
 .env
 
+# logs (structured logging --log-file)
+*.log
+*.log.*
+
 # Editor/IDE
 # .idea/
 # .vscode/
+# Local AI runtime state
+.atl/

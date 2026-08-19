@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"log/slog"
 	"os"
 )
 
@@ -15,12 +16,20 @@ func main() {
 	releaseGroupPtr := flag.String("release-group", "", "Required. Release group of the movie to search for.")
 	videoResolutionPtr := flag.String("video-resolution", "", "Required. Video resolution of the movie to search for.")
 	tmdbAPIKeyPtr := flag.String("tmdb-api-key", "", "Optional. TMDB API key.")
+	logLevelPtr := flag.String("log-level", "info", "Log level: debug|info|warn|error (default info, case-insensitive).")
+	logFilePtr := flag.String("log-file", "", "Optional. Append structured logs to file (O_APPEND 0644) in addition to stderr. Parent dir must exist.")
 
 	flag.Parse()
 
-	tmdbAPIKey, err := getTMDBAPIKey(tmdbAPIKeyPtr)
+	logger, logFile, _ := NewLogger(*logLevelPtr, *logFilePtr)
+	if logFile != nil {
+		defer logFile.Close()
+	}
+	slog.SetDefault(logger)
+
+	tmdbAPIKey, keySource, keyPresent, err := getTMDBAPIKey(tmdbAPIKeyPtr)
 	if err != nil {
-		fmt.Println("Error:", err)
+		slog.Error("failed to resolve tmdb key", "error", err, "title", *titlePtr, "media_type", *mediaTypePtr, "key_source", keySource, "key_present", keyPresent)
 		os.Exit(1)
 	}
 
@@ -31,13 +40,13 @@ func main() {
 
 	cfg, err := getConfig(fmt.Sprintf("%s-%s-%s", *releaseGroupPtr, *mediaTypePtr, *videoResolutionPtr))
 	if err != nil {
-		fmt.Println("Error:", err)
+		slog.Error("unsupported release group", "error", err, "title", *titlePtr, "media_type", *mediaTypePtr, "release_group", *releaseGroupPtr)
 		os.Exit(1)
 	}
 
 	mediaDetails, err := GetMediaDetailsWorkflow(*titlePtr, *mediaTypePtr, tmdbAPIKey, *yearPtr)
 	if err != nil {
-		fmt.Println("Error:", err)
+		slog.Error("tmdb workflow failed", "error", err, "title", *titlePtr, "media_type", *mediaTypePtr, "year", *yearPtr)
 		os.Exit(1)
 	}
 
@@ -57,10 +66,10 @@ func main() {
 	fmt.Printf("Score for %s [%s] %s: %f\n", mediaDetails.Title, *releaseGroupPtr, *videoResolutionPtr, score)
 
 	if score >= cfg.scoreThreshold {
-		fmt.Println("Exiting with status code 0")
+		slog.Info("exiting", "decision", "keep", "score", score, "threshold", cfg.scoreThreshold, "title", *titlePtr, "media_type", *mediaTypePtr, "release_group", *releaseGroupPtr, "video_resolution", *videoResolutionPtr, "tmdb_id", mediaDetails.ID, "resolved_title", mediaDetails.Title)
 		os.Exit(0)
 	}
 
-	fmt.Println("Exiting with status code 1")
+	slog.Info("exiting", "decision", "reject", "score", score, "threshold", cfg.scoreThreshold, "title", *titlePtr, "media_type", *mediaTypePtr, "release_group", *releaseGroupPtr, "video_resolution", *videoResolutionPtr, "tmdb_id", mediaDetails.ID, "resolved_title", mediaDetails.Title)
 	os.Exit(1)
 }
