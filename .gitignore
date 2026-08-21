@@ -18,10 +18,10 @@ coverage.*
 *.coverprofile
 profile.cov
 
-# Dependency directories (remove the comment below to include it)
-# vendor/
+# Dependency directories
 popularity-test/
 .kilo/
+.vendor/
 
 # Go workspace file
 go.work
@@ -37,8 +37,5 @@ go.work.sum
 # Editor/IDE
 # .idea/
 # .vscode/
-# Local AI runtime state
 .atl/
-
-# Judgment Day offline judge support (external reference only)
-.vendor/
+.pi/
