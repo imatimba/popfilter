@@ -39,3 +39,6 @@ go.work.sum
 # .vscode/
 # Local AI runtime state
 .atl/
+
+# Judgment Day offline judge support (external reference only)
+.vendor/
