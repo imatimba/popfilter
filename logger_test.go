@@ -113,7 +113,11 @@ func TestNewLogger_CaseInsensitiveLevel(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewLogger error: %v", err)
 	}
-	defer func() { if file != nil { file.Close() } }()
+	defer func() {
+		if file != nil {
+			file.Close()
+		}
+	}()
 	if !logger.Enabled(nil, slog.LevelDebug) {
 		t.Fatalf("DEBUG case-insensitive should enable debug")
 	}
@@ -245,4 +249,37 @@ func TestNewLogger_WithFile_MultiWriter(t *testing.T) {
 		t.Fatalf("file log missing attrs: %q", string(data))
 	}
 	// Ensure logger does not contain MkdirAll etc. - checked via static grep in T3
+}
+
+func TestNewLogger_InvalidLevelReturnsError(t *testing.T) {
+	logger, file, err := NewLogger("notalevel", "")
+	if err == nil {
+		t.Fatalf("expected error for invalid level, got nil")
+	}
+	if logger != nil {
+		t.Fatalf("expected nil logger on error, got %v", logger)
+	}
+	if file != nil {
+		t.Fatalf("expected nil file on error, got %v", file)
+	}
+	if !strings.Contains(err.Error(), "invalid --log-level") {
+		t.Fatalf("error %q should contain 'invalid --log-level'", err.Error())
+	}
+}
+
+func TestNewLogger_UnopenableFileReturnsError(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "nope", "x.log")
+	logger, file, err := NewLogger("info", path)
+	if err == nil {
+		t.Fatalf("expected error for unopenable file, got nil")
+	}
+	if logger != nil {
+		t.Fatalf("expected nil logger on file error, got %v", logger)
+	}
+	if file != nil {
+		t.Fatalf("expected nil file on error, got %v", file)
+	}
+	if !strings.Contains(err.Error(), path) {
+		t.Fatalf("error %q should contain path %q", err.Error(), path)
+	}
 }

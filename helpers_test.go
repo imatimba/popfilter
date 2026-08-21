@@ -70,7 +70,7 @@ func TestGetTMDBAPIKey_RedactedLogging_Env(t *testing.T) {
 	t.Setenv("TMDB_API_KEY", "secret123")
 	// Ensure .env does not interfere - unset file? godotenv.Load will run but env already set wins.
 	apiKeyArg := "flagKey"
-	key, source, present, err := getTMDBAPIKey(&apiKeyArg)
+	key, source, err := getTMDBAPIKey(&apiKeyArg)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -79,9 +79,6 @@ func TestGetTMDBAPIKey_RedactedLogging_Env(t *testing.T) {
 	}
 	if source != "env" {
 		t.Fatalf("source = %q, want %q", source, "env")
-	}
-	if !present {
-		t.Fatalf("present = false, want true")
 	}
 	logged := buf.String()
 	if !strings.Contains(logged, "key_source=env") {
@@ -117,7 +114,7 @@ func TestGetTMDBAPIKey_RedactedLogging_Flag(t *testing.T) {
 	defer func() { _ = os.Chdir(origWd) }()
 
 	apiKeyArg := "flagSecret999"
-	key, source, present, err := getTMDBAPIKey(&apiKeyArg)
+	key, source, err := getTMDBAPIKey(&apiKeyArg)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -126,9 +123,6 @@ func TestGetTMDBAPIKey_RedactedLogging_Flag(t *testing.T) {
 	}
 	if source != "flag" {
 		t.Fatalf("source = %q, want flag", source)
-	}
-	if !present {
-		t.Fatalf("present = false, want true")
 	}
 	logged := buf.String()
 	if strings.Contains(logged, "flagSecret999") {
@@ -157,15 +151,12 @@ func TestGetTMDBAPIKey_MissingLogsError(t *testing.T) {
 	defer func() { _ = os.Chdir(origWd) }()
 
 	empty := ""
-	_, source, present, err := getTMDBAPIKey(&empty)
+	_, source, err := getTMDBAPIKey(&empty)
 	if err == nil {
 		t.Fatalf("expected error for missing key")
 	}
 	if source != "missing" {
 		t.Fatalf("source = %q, want missing", source)
-	}
-	if present {
-		t.Fatalf("present = true, want false")
 	}
 	logged := buf.String()
 	if !strings.Contains(logged, "key_source=missing") {

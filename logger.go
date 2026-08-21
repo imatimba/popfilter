@@ -12,14 +12,15 @@ import (
 // levelStr is case-insensitive debug|info|warn|error; filePath is "" for stderr-only.
 // Returns (*slog.Logger, *os.File, error). File is nil when filePath == "".
 // Caller (main only) must defer file.Close() when non-nil and set it as default.
+// On invalid log level or unopenable file, returns nil, nil, and a wrapped error
+// (no process exit) so the caller can decide how to report usage and exit.
 func NewLogger(levelStr, filePath string) (*slog.Logger, *os.File, error) {
 	if levelStr == "" {
 		levelStr = "info"
 	}
 	level, err := parseLogLevel(levelStr)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "%v\n", err)
-		os.Exit(1)
+		return nil, nil, err
 	}
 
 	var w io.Writer = os.Stderr
@@ -28,8 +29,7 @@ func NewLogger(levelStr, filePath string) (*slog.Logger, *os.File, error) {
 	if filePath != "" {
 		f, err = openLogFile(filePath)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "failed to open --log-file %q: %v\n", filePath, err)
-			os.Exit(1)
+			return nil, nil, fmt.Errorf("failed to open --log-file %q: %w", filePath, err)
 		}
 		w = io.MultiWriter(os.Stderr, f)
 	}

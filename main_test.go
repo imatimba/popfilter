@@ -25,8 +25,8 @@ func TestScoringObservability_InfoHasDecisionAndCorrelation(t *testing.T) {
 	}
 	genres := []string{"History"}
 	score := 2.8 // >= 2.5207 => keep
-	// This function does not exist yet -> RED
-	logScoringDecision(cfg, mediaDetails, "Dune", "Movies", 2021, "BHDStudio", "2160p", "env", true, score, genres)
+	decision := "keep"
+	logScoringDecision(cfg, mediaDetails, "Dune", "Movies", 2021, "BHDStudio", "2160p", "env", decision, score, genres)
 
 	logged := buf.String()
 	if !strings.Contains(logged, "score decision") {
@@ -62,9 +62,6 @@ func TestScoringObservability_InfoHasDecisionAndCorrelation(t *testing.T) {
 	if !strings.Contains(logged, "key_source=env") {
 		t.Fatalf("expected key_source, got %q", logged)
 	}
-	if !strings.Contains(logged, "key_present=true") {
-		t.Fatalf("expected key_present, got %q", logged)
-	}
 	// At info level, per-field norms must be suppressed (popularity etc. only in debug)
 	if strings.Contains(logged, "popularity=") {
 		t.Fatalf("popularity should be absent at INFO level, got %q", logged)
@@ -95,7 +92,8 @@ func TestScoringObservability_DebugHasPerFieldNorms(t *testing.T) {
 	}
 	genres := []string{"Horror", "Family"}
 	score := 0.5 // < 0.9165 => reject for FLUX-TV-2160p
-	logScoringDecision(cfg, mediaDetails, "Test Show", "TV", 2022, "FLUX", "2160p", "flag", true, score, genres)
+	decision := "reject"
+	logScoringDecision(cfg, mediaDetails, "Test Show", "TV", 2022, "FLUX", "2160p", "flag", decision, score, genres)
 
 	logged := buf.String()
 	if !strings.Contains(logged, "decision=reject") {
@@ -144,7 +142,9 @@ func TestScoringObservability_NoRawKeyLeak(t *testing.T) {
 	// We pass keySource=flag (redacted), but ensure if someone accidentally logged raw key it would appear
 	// Here we verify our helper never logs raw secret even though we have it in scope
 	_ = secret
-	logScoringDecision(cfg, mediaDetails, "Dune", "Movies", 2021, "BHDStudio", "2160p", "flag", true, 1.0, genres)
+	decision := "reject"
+	// score 1.0 < 2.5207 => reject
+	logScoringDecision(cfg, mediaDetails, "Dune", "Movies", 2021, "BHDStudio", "2160p", "flag", decision, 1.0, genres)
 	logged := buf.String()
 	if strings.Contains(logged, secret) {
 		t.Fatalf("log leaked raw key %q in %q", secret, logged)
@@ -155,9 +155,6 @@ func TestScoringObservability_NoRawKeyLeak(t *testing.T) {
 	// Must have redacted fields
 	if !strings.Contains(logged, "key_source=flag") {
 		t.Fatalf("expected key_source=flag, got %q", logged)
-	}
-	if !strings.Contains(logged, "key_present=true") {
-		t.Fatalf("expected key_present=true, got %q", logged)
 	}
 }
 
@@ -172,7 +169,7 @@ func TestScoringObservability_PerGroupThresholdDiffers(t *testing.T) {
 	genres := []string{}
 	score := 1.5 // keep for 2160p, reject for 1080p
 
-	logScoringDecision(cfg2160, mediaDetails, "Show", "TV", 2020, "FLUX", "2160p", "env", true, score, genres)
+	logScoringDecision(cfg2160, mediaDetails, "Show", "TV", 2020, "FLUX", "2160p", "env", "keep", score, genres)
 	if !strings.Contains(buf.String(), "decision=keep") {
 		t.Fatalf("FLUX-TV-2160p threshold 0.9165 with score 1.5 should be keep, got %q", buf.String())
 	}
@@ -181,12 +178,30 @@ func TestScoringObservability_PerGroupThresholdDiffers(t *testing.T) {
 	}
 	buf.Reset()
 
-	logScoringDecision(cfg1080, mediaDetails, "Show", "TV", 2020, "FLUX", "1080p", "env", true, score, genres)
+	logScoringDecision(cfg1080, mediaDetails, "Show", "TV", 2020, "FLUX", "1080p", "env", "reject", score, genres)
 	if !strings.Contains(buf.String(), "decision=reject") {
 		t.Fatalf("FLUX-TV-1080p threshold 2.5803 with score 1.5 should be reject, got %q", buf.String())
 	}
 	if !strings.Contains(buf.String(), "threshold=2.5803") {
 		t.Fatalf("expected threshold 2.5803, got %q", buf.String())
+	}
+}
+
+func TestPrintUsage_DocumentsEnvOverrides(t *testing.T) {
+	var buf bytes.Buffer
+	printUsage(&buf)
+	out := buf.String()
+	if !strings.Contains(out, "TMDB_API_KEY") {
+		t.Fatalf("printUsage missing TMDB_API_KEY, got %q", out)
+	}
+	if !strings.Contains(out, "TMDB_BASE_URL") {
+		t.Fatalf("printUsage missing TMDB_BASE_URL, got %q", out)
+	}
+	if !strings.Contains(out, "env var > .env file > --tmdb-api-key") {
+		t.Fatalf("printUsage missing precedence note 'env var > .env file > --tmdb-api-key', got %q", out)
+	}
+	if !strings.Contains(out, "https://api.themoviedb.org/3") {
+		t.Fatalf("printUsage missing default TMDB base URL, got %q", out)
 	}
 }
 
