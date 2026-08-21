@@ -45,11 +45,14 @@ func SearchMediaID(title, mediaType, tmdbAPIKey string, year int64) (int64, erro
 		return 0, err
 	}
 
-	url := fmt.Sprintf("%s/search/%s?query=%s&include_adult=true", tmdbBaseURL, mediaType, url.PathEscape(title))
+	searchURL := fmt.Sprintf("%s/search/%s?query=%s&include_adult=true", tmdbBaseURL, mediaType, url.QueryEscape(title))
+	if year > 0 {
+		searchURL += fmt.Sprintf("&year=%d", year)
+	}
 
 	var searchResp SearchResponse
 
-	err = doTMDBGet(url, tmdbAPIKey, &searchResp)
+	err = doTMDBGet(searchURL, tmdbAPIKey, &searchResp)
 	if err != nil {
 		return 0, err
 	}
@@ -59,20 +62,58 @@ func SearchMediaID(title, mediaType, tmdbAPIKey string, year int64) (int64, erro
 		return 0, fmt.Errorf("no media found for query: %s", title)
 	}
 
+	wantYear := strconv.FormatInt(year, 10)
 	for _, result := range searchResp.Results {
-		if result.ReleaseDate == "" {
+		displayName := result.Title
+		if displayName == "" {
+			displayName = result.Name
+		}
+		if !titlesEqual(title, displayName) {
 			continue
 		}
 
-		releaseYear := result.ReleaseDate[:4]
-		if result.Title == title && releaseYear == fmt.Sprintf("%d", year) {
-			slog.Info("tmdb search result", "title", title, "media_type", mediaType, "year", year, "tmdb_search_query", title, "tmdb_id", result.ID, "fallback_reason", "exact_match", "attempt", 1)
-			return result.ID, nil
+		// Year agreement is required only when the caller supplied a year;
+		// date sources are ReleaseDate for movies and FirstAirDate for TV.
+		if year > 0 {
+			dateStr := result.ReleaseDate
+			if dateStr == "" {
+				dateStr = result.FirstAirDate
+			}
+			if len(dateStr) < 4 || dateStr[:4] != wantYear {
+				continue
+			}
 		}
+
+		slog.Info("tmdb search result", "title", title, "media_type", mediaType, "year", year, "tmdb_search_query", title, "tmdb_id", result.ID, "fallback_reason", "exact_match", "attempt", 1)
+		return result.ID, nil
 	}
 
-	slog.Info("tmdb search result", "title", title, "media_type", mediaType, "year", year, "tmdb_search_query", title, "tmdb_id", searchResp.Results[0].ID, "fallback_reason", "fallback_first_result", "attempt", 1)
-	return searchResp.Results[0].ID, nil
+	first := searchResp.Results[0]
+	attrs := []any{"title", title, "media_type", mediaType, "year", year, "tmdb_search_query", title, "tmdb_id", first.ID, "fallback_reason", "fallback_first_result", "attempt", 1}
+	candidates := len(searchResp.Results)
+	if candidates > 3 {
+		candidates = 3
+	}
+	for i := 0; i < candidates; i++ {
+		r := searchResp.Results[i]
+		name := r.Title
+		if name == "" {
+			name = r.Name
+		}
+		attrs = append(attrs, fmt.Sprintf("candidate_%d_id", i), r.ID, fmt.Sprintf("candidate_%d_name", i), name)
+	}
+	slog.Warn("tmdb search falling back to first result", attrs...)
+	return first.ID, nil
+}
+
+// titlesEqual compares a search result's display name against the queried
+// title case-insensitively with collapsed whitespace.
+func titlesEqual(query, displayName string) bool {
+	return normalizeTitle(query) == normalizeTitle(displayName)
+}
+
+func normalizeTitle(s string) string {
+	return strings.ToLower(strings.Join(strings.Fields(s), " "))
 }
 
 func GetMediaDetails(id int64, mediaType, tmdbAPIKey string) (MediaResult, error) {
@@ -100,10 +141,14 @@ func GetMediaDetails(id int64, mediaType, tmdbAPIKey string) (MediaResult, error
 	// Resolve title for logging before parsing year
 	resolvedTitle := mediaDetails.Title
 
-	if mediaDetails.ReleaseDate == "" {
-		mediaDetails.ReleaseYear, err = strconv.ParseInt(mediaDetails.FirstAirDate[:4], 10, 64)
+	dateStr := mediaDetails.ReleaseDate
+	if dateStr == "" {
+		dateStr = mediaDetails.FirstAirDate
+	}
+	if len(dateStr) < 4 {
+		err = fmt.Errorf("missing or too short release/first-air date")
 	} else {
-		mediaDetails.ReleaseYear, err = strconv.ParseInt(mediaDetails.ReleaseDate[:4], 10, 64)
+		mediaDetails.ReleaseYear, err = strconv.ParseInt(dateStr[:4], 10, 64)
 	}
 
 	if err != nil {

@@ -360,3 +360,361 @@ func TestGetMediaDetailsWorkflow_LogsError(t *testing.T) {
 		t.Fatalf("leaked secret")
 	}
 }
+
+// TestSearchMediaID_TVNameExactMatch: a TV search result carries Name +
+// FirstAirDate (not Title/ReleaseDate). Exact match must fire on the
+// display name with year agreement derived from FirstAirDate.
+func TestSearchMediaID_TVNameExactMatch(t *testing.T) {
+	buf, restore := setupBufferLogger(slog.LevelDebug)
+	defer restore()
+
+	origBase := tmdbBaseURL
+	defer func() { tmdbBaseURL = origBase }()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !strings.HasPrefix(r.URL.Path, "/search/tv") {
+			t.Errorf("unexpected path %q", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		resp := SearchResponse{
+			Results: []MediaResult{
+				{ID: 1416, Name: "Grey's Anatomy", FirstAirDate: "2005-03-27"},
+				{ID: 9999, Name: "S&X", FirstAirDate: "2023-05-01"},
+			},
+		}
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer srv.Close()
+	tmdbBaseURL = srv.URL
+
+	id, err := SearchMediaID("S&X", "TV", "secret123", 2023)
+	if err != nil {
+		t.Fatalf("SearchMediaID error: %v", err)
+	}
+	if id != 9999 {
+		t.Fatalf("expected exact match on TV Name to ID 9999, got %d", id)
+	}
+	logged := buf.String()
+	if !strings.Contains(logged, "fallback_reason=exact_match") {
+		t.Fatalf("expected fallback_reason=exact_match, got %q", logged)
+	}
+}
+
+// TestSearchMediaID_TVNameExactMatchYearZero: with year=0 the year
+// agreement must be skipped entirely; name-only exact match fires even
+// when the result has no usable date fields.
+func TestSearchMediaID_TVNameExactMatchYearZero(t *testing.T) {
+	buf, restore := setupBufferLogger(slog.LevelDebug)
+	defer restore()
+
+	origBase := tmdbBaseURL
+	defer func() { tmdbBaseURL = origBase }()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		resp := SearchResponse{
+			Results: []MediaResult{
+				// Decoy first so accidental fallback cannot satisfy the assertion.
+				{ID: 6666, Name: "Decoy Show"},
+				{ID: 7777, Name: "S&X"},
+			},
+		}
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer srv.Close()
+	tmdbBaseURL = srv.URL
+
+	id, err := SearchMediaID("S&X", "TV", "secret123", 0)
+	if err != nil {
+		t.Fatalf("SearchMediaID error: %v", err)
+	}
+	if id != 7777 {
+		t.Fatalf("expected name-only exact match to ID 7777 with year=0, got %d", id)
+	}
+	logged := buf.String()
+	if !strings.Contains(logged, "fallback_reason=exact_match") {
+		t.Fatalf("expected fallback_reason=exact_match, got %q", logged)
+	}
+}
+
+// TestSearchMediaID_NormalizedCompare: exact match is case-insensitive
+// with collapsed whitespace.
+func TestSearchMediaID_NormalizedCompare(t *testing.T) {
+	buf, restore := setupBufferLogger(slog.LevelDebug)
+	defer restore()
+
+	origBase := tmdbBaseURL
+	defer func() { tmdbBaseURL = origBase }()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		resp := SearchResponse{
+			Results: []MediaResult{
+				// Decoy first so accidental fallback cannot satisfy the assertion.
+				{ID: 4444, Title: "Something Else", ReleaseDate: "2000-01-01"},
+				{ID: 5555, Title: "the  dark  knight", ReleaseDate: "2008-07-18"},
+			},
+		}
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer srv.Close()
+	tmdbBaseURL = srv.URL
+
+	id, err := SearchMediaID("The Dark Knight", "Movies", "secret123", 2008)
+	if err != nil {
+		t.Fatalf("SearchMediaID error: %v", err)
+	}
+	if id != 5555 {
+		t.Fatalf("expected normalized-case exact match to ID 5555, got %d", id)
+	}
+	logged := buf.String()
+	if !strings.Contains(logged, "fallback_reason=exact_match") {
+		t.Fatalf("expected fallback_reason=exact_match, got %q", logged)
+	}
+}
+
+// TestSearchMediaID_WireQueryEncoded: the query parameter must be sent
+// with url.QueryEscape so &, +, = survive intact on the wire. With the
+// old PathEscape the raw query contained a bare & which split the
+// parameter server-side.
+func TestSearchMediaID_WireQueryEncoded(t *testing.T) {
+	_, restore := setupBufferLogger(slog.LevelDebug)
+	defer restore()
+
+	origBase := tmdbBaseURL
+	defer func() { tmdbBaseURL = origBase }()
+
+	var gotQuery string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotQuery = r.URL.RawQuery
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(SearchResponse{Results: []MediaResult{{ID: 1, Name: "S&X", FirstAirDate: "2023-01-01"}}})
+	}))
+	defer srv.Close()
+	tmdbBaseURL = srv.URL
+
+	id, err := SearchMediaID("S&X", "TV", "secret123", 0)
+	if err != nil {
+		t.Fatalf("SearchMediaID error: %v", err)
+	}
+	if id != 1 {
+		t.Fatalf("expected exact match ID 1, got %d", id)
+	}
+	if !strings.Contains(gotQuery, "%26") {
+		t.Fatalf("expected %%26 in raw query, got %q", gotQuery)
+	}
+	if strings.Contains(gotQuery[:strings.Index(gotQuery, "&include_adult")], "S&X") {
+		t.Fatalf("raw query contains unencoded & inside query value: %q", gotQuery)
+	}
+}
+
+// TestSearchMediaID_YearParamPassThrough: the TMDB year parameter is sent
+// only when year > 0.
+func TestSearchMediaID_YearParamPassThrough(t *testing.T) {
+	tests := []struct {
+		name     string
+		year     int64
+		wantYear string
+	}{
+		{"year sent when positive", 2021, "2021"},
+		{"year omitted when zero", 0, ""},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			_, restore := setupBufferLogger(slog.LevelDebug)
+			defer restore()
+
+			origBase := tmdbBaseURL
+			defer func() { tmdbBaseURL = origBase }()
+
+			var gotYear string
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				gotYear = r.URL.Query().Get("year")
+				w.Header().Set("Content-Type", "application/json")
+				_ = json.NewEncoder(w).Encode(SearchResponse{Results: []MediaResult{{ID: 42, Title: "Dune", ReleaseDate: "2021-10-22"}}})
+			}))
+			defer srv.Close()
+			tmdbBaseURL = srv.URL
+
+			if _, err := SearchMediaID("Dune", "Movies", "secret123", tt.year); err != nil {
+				t.Fatalf("SearchMediaID error: %v", err)
+			}
+			if gotYear != tt.wantYear {
+				t.Fatalf("year param = %q, want %q", gotYear, tt.wantYear)
+			}
+		})
+	}
+}
+
+// TestGetMediaDetails_MissingDatesErrorsNotPanic: empty ReleaseDate AND
+// empty FirstAirDate must return an error, never a slice-bounds panic
+// from date[:4].
+func TestGetMediaDetails_MissingDatesErrorsNotPanic(t *testing.T) {
+	_, restore := setupBufferLogger(slog.LevelDebug)
+	defer restore()
+
+	origBase := tmdbBaseURL
+	defer func() { tmdbBaseURL = origBase }()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		resp := MediaResult{ID: 123, Title: "Dateless", Popularity: 1.0, VoteAverage: 5.0, VoteCount: 10, OriginalLanguage: "en"}
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer srv.Close()
+	tmdbBaseURL = srv.URL
+
+	_, err := GetMediaDetails(123, "Movies", "secret123")
+	if err == nil {
+		t.Fatalf("expected error for missing release/first-air dates, got nil")
+	}
+}
+
+// TestGetMediaDetails_ShortFirstAirDateErrorsNotPanic: a too-short date
+// string must error instead of panicking on date[:4].
+func TestGetMediaDetails_ShortFirstAirDateErrorsNotPanic(t *testing.T) {
+	_, restore := setupBufferLogger(slog.LevelDebug)
+	defer restore()
+
+	origBase := tmdbBaseURL
+	defer func() { tmdbBaseURL = origBase }()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		resp := MediaResult{ID: 124, Name: "Partial Date", FirstAirDate: "20"}
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer srv.Close()
+	tmdbBaseURL = srv.URL
+
+	_, err := GetMediaDetails(124, "TV", "secret123")
+	if err == nil {
+		t.Fatalf("expected error for short first air date, got nil")
+	}
+}
+
+// TestSearchMediaID_FallbackWarnsCandidates: fallback must surface top
+// candidates via slog.Warn (never silent).
+func TestSearchMediaID_FallbackWarnsCandidates(t *testing.T) {
+	buf, restore := setupBufferLogger(slog.LevelDebug)
+	defer restore()
+
+	origBase := tmdbBaseURL
+	defer func() { tmdbBaseURL = origBase }()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		resp := SearchResponse{
+			Results: []MediaResult{
+				{ID: 10, Title: "Dune Part Two", ReleaseDate: "2024-03-01"},
+				{ID: 11, Title: "Other", ReleaseDate: "2021-10-22"},
+				{ID: 12, Title: "Third", ReleaseDate: "2020-01-01"},
+				{ID: 13, Title: "Fourth", ReleaseDate: "2019-01-01"},
+			},
+		}
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer srv.Close()
+	tmdbBaseURL = srv.URL
+
+	id, err := SearchMediaID("Dune", "Movies", "secret123", 2021)
+	if err != nil {
+		t.Fatalf("SearchMediaID error: %v", err)
+	}
+	if id != 10 {
+		t.Fatalf("expected fallback to first result ID 10, got %d", id)
+	}
+	logged := buf.String()
+	if !strings.Contains(logged, "level=WARN") {
+		t.Fatalf("expected WARN level on fallback, got %q", logged)
+	}
+	for _, want := range []string{"candidate_0_id=10", "candidate_1_id=11", "candidate_2_id=12"} {
+		if !strings.Contains(logged, want) {
+			t.Fatalf("expected candidate field %q in warn log, got %q", want, logged)
+		}
+	}
+	if strings.Contains(logged, "candidate_3_id=13") {
+		t.Fatalf("warn log must list at most 3 candidates, got %q", logged)
+	}
+}
+
+// TestSearchMediaID_YearMismatchSkipsTitleMatch: a display-name match with
+// a disagreeing release year must be skipped in favor of the warned
+// first-result fallback. Guards against dropping or inverting the year
+// comparison — mutations that would silently resolve same-title
+// different-era entries (e.g. Dune 1984 vs 2021) to the wrong TMDB ID.
+func TestSearchMediaID_YearMismatchSkipsTitleMatch(t *testing.T) {
+	buf, restore := setupBufferLogger(slog.LevelDebug)
+	defer restore()
+
+	origBase := tmdbBaseURL
+	defer func() { tmdbBaseURL = origBase }()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		resp := SearchResponse{
+			Results: []MediaResult{
+				// Decoy first: correct behavior falls back to it; a dropped
+				// or inverted year comparison would exact-match ID 5555.
+				{ID: 4444, Title: "Something Else", ReleaseDate: "2000-01-01"},
+				{ID: 5555, Title: "Dune", ReleaseDate: "2021-10-22"},
+			},
+		}
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer srv.Close()
+	tmdbBaseURL = srv.URL
+
+	id, err := SearchMediaID("Dune", "Movies", "secret123", 1984)
+	if err != nil {
+		t.Fatalf("SearchMediaID error: %v", err)
+	}
+	if id != 4444 {
+		t.Fatalf("expected year-mismatched candidate to be skipped (fallback to 4444), got %d", id)
+	}
+	logged := buf.String()
+	if !strings.Contains(logged, "fallback_reason=fallback_first_result") {
+		t.Fatalf("expected warned fallback, got %q", logged)
+	}
+	if strings.Contains(logged, "fallback_reason=exact_match") {
+		t.Fatalf("exact_match must not fire on year disagreement, got %q", logged)
+	}
+}
+
+// TestSearchMediaID_ShortDateSkipsCandidateWithoutPanic: a title-matching
+// candidate with an unusable (<4 char) date string is skipped by the len
+// guard instead of panicking on date[:4].
+func TestSearchMediaID_ShortDateSkipsCandidateWithoutPanic(t *testing.T) {
+	buf, restore := setupBufferLogger(slog.LevelDebug)
+	defer restore()
+
+	origBase := tmdbBaseURL
+	defer func() { tmdbBaseURL = origBase }()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		resp := SearchResponse{
+			Results: []MediaResult{
+				{ID: 7777, Title: "Dune", ReleaseDate: "20"},
+				{ID: 8888, Title: "Other", ReleaseDate: "2001-01-01"},
+			},
+		}
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer srv.Close()
+	tmdbBaseURL = srv.URL
+
+	id, err := SearchMediaID("Dune", "Movies", "secret123", 2023)
+	if err != nil {
+		t.Fatalf("SearchMediaID error: %v", err)
+	}
+	if id != 7777 {
+		t.Fatalf("expected guarded skip then fallback to first result 7777, got %d", id)
+	}
+	logged := buf.String()
+	if !strings.Contains(logged, "fallback_reason=fallback_first_result") {
+		t.Fatalf("expected warned fallback after guarded skip, got %q", logged)
+	}
+}
