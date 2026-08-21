@@ -40,6 +40,10 @@ func main() {
 
 	flag.Parse()
 
+	// flag.Set assigns verbatim, so literal quote pollution from callers
+	// survives Parse. Sanitize the title before any downstream use.
+	*titlePtr = sanitizeTitle(*titlePtr)
+
 	logger, logFile, err := NewLogger(*logLevelPtr, *logFilePtr)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
