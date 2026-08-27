@@ -102,7 +102,9 @@ func TestGetTMDBAPIKey_RedactedLogging_Flag(t *testing.T) {
 
 	// Clear env
 	t.Setenv("TMDB_API_KEY", "")
-	os.Unsetenv("TMDB_API_KEY")
+	if err := os.Unsetenv("TMDB_API_KEY"); err != nil {
+		t.Fatalf("Unsetenv: %v", err)
+	}
 	// Remove .env effect by ensuring no TMDB_API_KEY in file
 	// We call godotenv.Load inside function; if .env has key, it would win over flag.
 	// Test in temp dir without .env
@@ -142,7 +144,9 @@ func TestGetTMDBAPIKey_MissingLogsError(t *testing.T) {
 	slog.SetDefault(slog.New(handler))
 
 	t.Setenv("TMDB_API_KEY", "")
-	os.Unsetenv("TMDB_API_KEY")
+	if err := os.Unsetenv("TMDB_API_KEY"); err != nil {
+		t.Fatalf("Unsetenv: %v", err)
+	}
 	origWd, _ := os.Getwd()
 	tmp := t.TempDir()
 	if err := os.Chdir(tmp); err != nil {

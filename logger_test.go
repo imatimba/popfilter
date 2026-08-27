@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -65,10 +66,10 @@ func TestNewLogger_StdErrOnly(t *testing.T) {
 		t.Fatalf("expected non-nil logger")
 	}
 	// Level INFO: debug disabled, info enabled
-	if logger.Enabled(nil, slog.LevelDebug) {
+	if logger.Enabled(context.TODO(), slog.LevelDebug) {
 		t.Fatalf("INFO logger should not enable DEBUG")
 	}
-	if !logger.Enabled(nil, slog.LevelInfo) {
+	if !logger.Enabled(context.TODO(), slog.LevelInfo) {
 		t.Fatalf("INFO logger should enable INFO")
 	}
 }
@@ -81,13 +82,13 @@ func TestNewLogger_HandlerLevelWarn(t *testing.T) {
 	if file != nil {
 		t.Fatalf("expected file nil")
 	}
-	if logger.Enabled(nil, slog.LevelInfo) {
+	if logger.Enabled(context.TODO(), slog.LevelInfo) {
 		t.Fatalf("WARN logger should not enable INFO")
 	}
-	if !logger.Enabled(nil, slog.LevelWarn) {
+	if !logger.Enabled(context.TODO(), slog.LevelWarn) {
 		t.Fatalf("WARN logger should enable WARN")
 	}
-	if !logger.Enabled(nil, slog.LevelError) {
+	if !logger.Enabled(context.TODO(), slog.LevelError) {
 		t.Fatalf("WARN logger should enable ERROR")
 	}
 }
@@ -100,10 +101,10 @@ func TestNewLogger_DebugEnablesAll(t *testing.T) {
 	if file != nil {
 		t.Fatalf("expected nil file")
 	}
-	if !logger.Enabled(nil, slog.LevelDebug) {
+	if !logger.Enabled(context.TODO(), slog.LevelDebug) {
 		t.Fatalf("DEBUG should enable DEBUG")
 	}
-	if !logger.Enabled(nil, slog.LevelWarn) {
+	if !logger.Enabled(context.TODO(), slog.LevelWarn) {
 		t.Fatalf("DEBUG should enable WARN")
 	}
 }
@@ -115,10 +116,10 @@ func TestNewLogger_CaseInsensitiveLevel(t *testing.T) {
 	}
 	defer func() {
 		if file != nil {
-			file.Close()
+			_ = file.Close()
 		}
 	}()
-	if !logger.Enabled(nil, slog.LevelDebug) {
+	if !logger.Enabled(context.TODO(), slog.LevelDebug) {
 		t.Fatalf("DEBUG case-insensitive should enable debug")
 	}
 }
@@ -129,7 +130,7 @@ func TestNewLogger_BufferHandlerLevelSeam(t *testing.T) {
 	// Use factory-like helper via TextHandler directly to verify level semantics
 	handler := slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelInfo})
 	logger := slog.New(handler)
-	if logger.Enabled(nil, slog.LevelDebug) {
+	if logger.Enabled(context.TODO(), slog.LevelDebug) {
 		t.Fatalf("INFO handler should not enable DEBUG")
 	}
 	logger.Info("info msg", "key", "value")
@@ -157,12 +158,14 @@ func TestOpenLogFile_AppendNotTruncate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("openLogFile error: %v", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	if _, err := f.WriteString("new\n"); err != nil {
 		t.Fatalf("write: %v", err)
 	}
-	f.Close()
+	if err := f.Close(); err != nil {
+		t.Fatalf("close: %v", err)
+	}
 
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -189,7 +192,7 @@ func TestOpenLogFile_ParentMissing(t *testing.T) {
 	f, err := openLogFile(path)
 	if err == nil {
 		if f != nil {
-			f.Close()
+			_ = f.Close()
 		}
 		t.Fatalf("expected error for missing parent dir, got nil")
 	}
@@ -210,7 +213,9 @@ func TestOpenLogFile_Permissions(t *testing.T) {
 	if err != nil {
 		t.Fatalf("openLogFile error: %v", err)
 	}
-	f.Close()
+	if err := f.Close(); err != nil {
+		t.Fatalf("close: %v", err)
+	}
 	info, err := os.Stat(path)
 	if err != nil {
 		t.Fatalf("stat: %v", err)
@@ -230,7 +235,7 @@ func TestNewLogger_WithFile_MultiWriter(t *testing.T) {
 	if file == nil {
 		t.Fatalf("expected file non-nil")
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	// Verify file exists and handler writes to both stderr and file
 	// Since NewLogger uses io.MultiWriter(os.Stderr, file), file should receive records

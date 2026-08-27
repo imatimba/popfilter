@@ -201,7 +201,7 @@ func doTMDBGet(url, tmdbAPIKey string, target any) error {
 		slog.Error("tmdb request failed", "url_path", redactURLPath(url), "duration_ms", durationMs, "error", err, "attempt", 1, "auth_present", authPresent)
 		return fmt.Errorf("failed to make request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	statusCode := resp.StatusCode
 	if statusCode != http.StatusOK {

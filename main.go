@@ -9,19 +9,19 @@ import (
 )
 
 func printUsage(w io.Writer) {
-	fmt.Fprintln(w, "popfilter - evaluate torrent release desirability using TMDB features")
-	fmt.Fprintln(w, "")
-	fmt.Fprintln(w, "Usage: popfilter [flags]")
-	fmt.Fprintln(w, "")
-	fmt.Fprintln(w, "Flags:")
+	_, _ = fmt.Fprintln(w, "popfilter - evaluate torrent release desirability using TMDB features")
+	_, _ = fmt.Fprintln(w, "")
+	_, _ = fmt.Fprintln(w, "Usage: popfilter [flags]")
+	_, _ = fmt.Fprintln(w, "")
+	_, _ = fmt.Fprintln(w, "Flags:")
 	prev := flag.CommandLine.Output()
 	flag.CommandLine.SetOutput(w)
 	flag.PrintDefaults()
 	flag.CommandLine.SetOutput(prev)
-	fmt.Fprintln(w, "")
-	fmt.Fprintln(w, "Environment:")
-	fmt.Fprintln(w, "  TMDB_API_KEY   API key; resolution order is env var > .env file > --tmdb-api-key flag")
-	fmt.Fprintln(w, "  TMDB_BASE_URL  Overrides the TMDB API base URL (default https://api.themoviedb.org/3); mainly for testing/proxies")
+	_, _ = fmt.Fprintln(w, "")
+	_, _ = fmt.Fprintln(w, "Environment:")
+	_, _ = fmt.Fprintln(w, "  TMDB_API_KEY   API key; resolution order is env var > .env file > --tmdb-api-key flag")
+	_, _ = fmt.Fprintln(w, "  TMDB_BASE_URL  Overrides the TMDB API base URL (default https://api.themoviedb.org/3); mainly for testing/proxies")
 }
 
 func main() {
@@ -51,7 +51,7 @@ func main() {
 		os.Exit(1)
 	}
 	if logFile != nil {
-		defer logFile.Close()
+		defer func() { _ = logFile.Close() }()
 	}
 	slog.SetDefault(logger)
 
