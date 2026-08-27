@@ -4,60 +4,9 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"strings"
 
 	"github.com/joho/godotenv"
 )
-
-// preprocessArgs merges a bare (unquoted) -title value spread across
-// multiple argv tokens into a single token so flag.Parse() handles it.
-// e.g. ["-title", "The", "Dark", "Knight", "-year", "2008"]
-//
-//	-> ["-title", "The Dark Knight", "-year", "2008"]
-func preprocessArgs(args []string) []string {
-	// Flags that consume a value. We stop collecting title words when we
-	// hit one of these.
-	valueFlags := map[string]bool{
-		"-title":             true,
-		"--title":            true,
-		"-year":              true,
-		"--year":             true,
-		"-media-type":        true,
-		"--media-type":       true,
-		"-release-group":     true,
-		"--release-group":    true,
-		"-video-resolution":  true,
-		"--video-resolution": true,
-		"-tmdb-api-key":      true,
-		"--tmdb-api-key":     true,
-		"-log-level":         true,
-		"--log-level":        true,
-		"-log-file":          true,
-		"--log-file":         true,
-	}
-
-	var result []string
-	i := 0
-	for i < len(args) {
-		arg := args[i]
-		if arg == "-title" || arg == "--title" {
-			result = append(result, arg)
-			i++
-			var titleParts []string
-			for i < len(args) && !valueFlags[args[i]] {
-				titleParts = append(titleParts, args[i])
-				i++
-			}
-			if len(titleParts) > 0 {
-				result = append(result, strings.Join(titleParts, " "))
-			}
-			continue
-		}
-		result = append(result, arg)
-		i++
-	}
-	return result
-}
 
 func getTMDBAPIKey(argAPIKey *string) (string, string, error) {
 	// 1. Explicit env var (most portable)

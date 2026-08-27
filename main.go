@@ -25,8 +25,6 @@ func printUsage(w io.Writer) {
 }
 
 func main() {
-	os.Args = preprocessArgs(os.Args)
-
 	flag.Usage = func() { printUsage(os.Stderr) }
 
 	titlePtr := flag.String("title", "", "Required. Title of the movie to search for.")
